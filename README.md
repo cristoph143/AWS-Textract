@@ -29,7 +29,7 @@ git clone <repository-url>
 ```
 cd <application-directory>
 ```
-
+ * Tip: There are .env or .flaskenv files present. Do "pip install python-dotenv" to use them.
 3. **Install virtualenv:**
 
    Before setting up the project environment, you need to install `virtualenv` if you haven't already. This tool helps create isolated Python environments. Install it globally using pip:

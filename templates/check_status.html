@@ -7,24 +7,33 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script>
         $(document).ready(function () {
-    var jobId = "{{ job_id }}";
-    function checkStatus() {
-        $.ajax({
-            type: "POST",
-            url: "/result",
-            data: { jobId: jobId },
-            success: function (htmlContent) {
-                // Directly use the HTML content received
-                $('#resultContainer').html(htmlContent);
-            },
-            error: function (xhr, status, error) {
-                console.log("Error:", error); // Log any error
-                $('#resultContainer').text('An error occurred while processing your request.');
+            var jobId = "{{ job_id }}";
+            function checkStatus() {
+                $.ajax({
+                    type: "POST",
+                    url: "/result",
+                    data: { jobId: jobId },
+                    success: function (data) {
+                        if (data.status === 'COMPLETED') {
+                            // Process and display the extracted data
+                            console.log('Data:', data.data);
+                            // You might want to render this data on the page
+                        } else if (data.status === 'IN_PROGRESS') {
+                            // The job is still processing; poll again after some delay
+                            setTimeout(checkStatus, 5000);
+                        } else {
+                            // Handle any errors or failed processing status
+                            console.error('Processing failed or error occurred');
+                        }
+                    },
+                    error: function (xhr, status, error) {
+                        console.log("Error:", error); // Log any error
+                        $('#resultContainer').text('An error occurred while processing your request.');
+                    }
+                });
             }
+            checkStatus();
         });
-    }
-    checkStatus();
-});
 
     </script>
 </head>

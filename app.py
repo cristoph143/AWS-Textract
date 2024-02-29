@@ -8,7 +8,46 @@ app = Flask(__name__)
 s3 = boto3.client('s3')
 textract = boto3.client('textract', region_name='us-east-1')
 
-BUCKET_NAME = 'textra-bucket'  # Replace with your actual S3 bucket name
+BUCKET_NAME = 'textra-bucket' 
+
+def process_upload(file):
+    if not file or file.filename == '':
+        return None, 'No selected file or file part'
+
+    if allowed_file(file.filename):
+        file_key = 'uploads/' + file.filename
+        s3.upload_fileobj(file, BUCKET_NAME, file_key)
+
+        response = textract.start_document_text_detection(
+            DocumentLocation={'S3Object': {'Bucket': BUCKET_NAME, 'Name': file_key}}
+        )
+        return response['JobId'], None
+    else:
+        return None, 'Unsupported file type'
+
+def allowed_file(filename):
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf', 'doc', 'docx'}
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def process_textract_data(response):
+    """
+    Processes the data returned by Textract and extracts text and confidence scores.
+
+    :param response: The response from Textract after processing a document.
+    :return: A list of dictionaries containing the extracted text and confidence scores.
+    """
+    processed_data = []
+
+    # Assuming 'Blocks' contain the lines of text you're interested in
+    for block in response.get('Blocks', []):
+        if block['BlockType'] == 'LINE':
+            text_data = {
+                'text': block.get('Text', ''),
+                'confidence': block.get('Confidence', 0)
+            }
+            processed_data.append(text_data)
+
+    return processed_data
 
 @app.route('/')
 def index():
@@ -16,31 +55,50 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    if 'document' not in request.files:
-        return 'No file part'
+    file = request.files.get('document')
+    job_id, error = process_upload(file)
 
-    file = request.files['document']
+    if error:
+        return error
 
-    if file.filename == '':
-        return 'No selected file'
+    # Render a template that includes JavaScript for polling
+    return render_template('check_status.html', job_id=job_id)
 
-    if file and allowed_file(file.filename):
-        file_key = 'uploads/' + file.filename
-        s3.upload_fileobj(file, BUCKET_NAME, file_key)
 
-        response = textract.start_document_text_detection(
-            DocumentLocation={'S3Object': {'Bucket': BUCKET_NAME, 'Name': file_key}}
-        )
-        
-        job_id = response['JobId']
-        
-        # Render a template that includes JavaScript for polling
-        return render_template('check_status.html', job_id=job_id)
+@app.route('/api/upload', methods=['POST'])
+def api_upload_file():
+    file = request.files.get('document')
+    job_id, error = process_upload(file)
+    
+# Render a template that includes JavaScript for polling
+    render_template('check_status.html', job_id=job_id)
+    if error:
+        return jsonify({'error': error}), 400
+
+    return jsonify({'jobId': job_id})
+
+
+@app.route('/status', methods=['POST'])
+def get_status():
+    job_id = request.form.get('jobId')
+
+    if not job_id:
+        return jsonify({'error': 'Missing job ID'}), 400
+
+    # Check the status of the Textract job
+    response = textract.get_document_text_detection(JobId=job_id)
+
+    if response['JobStatus'] == 'SUCCEEDED':
+        # Extract relevant data from the response
+        extracted_data = process_textract_data(response)
+        return jsonify({'status': 'COMPLETED', 'data': extracted_data})
+    elif response['JobStatus'] == 'IN_PROGRESS':
+        return jsonify({'status': 'IN_PROGRESS'})
     else:
-        return 'Unsupported file type'
+        return jsonify({'status': 'FAILED'})
 
 
-@app.route('/result', methods=['GET', 'POST'])
+@app.route('/result', methods=['POST'])
 def get_result():
     if request.method == 'POST':
         job_id = request.form['jobId']
@@ -48,27 +106,23 @@ def get_result():
         # Poll Textract to get the job status
         response = textract.get_document_text_detection(JobId=job_id)
 
+        # Wait for the job to complete (consider moving this to a background task or asynchronous polling instead)
         while response['JobStatus'] == 'IN_PROGRESS':
-            time.sleep(5)
+            time.sleep(5)  # Implement exponential backoff in a production environment
             response = textract.get_document_text_detection(JobId=job_id)
 
+        # Process the response when the job is completed
         if response['JobStatus'] == 'SUCCEEDED':
-            details = []
-            for item in response['Blocks']:
-                if item['BlockType'] == 'LINE':
-                    details.append({'text': item['Text'], 'confidence': item['Confidence']})
-
-            return render_template('result.html', extracted_details=details)
+            # Use the process_textract_data function to process the response
+            extracted_details = process_textract_data(response)
+            return render_template('result.html', extracted_details=extracted_details)
         else:
             return 'Text detection did not succeed'
     else:
-        # GET request: you could provide a meaningful response or redirect
+        # This branch should only occur if something other than POST is used
         return "This endpoint requires a POST request."
 
 
-def allowed_file(filename):
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf', 'doc', 'docx'}
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
 if __name__ == '__main__':
     app.run(debug=True)
+
