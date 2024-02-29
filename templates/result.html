@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Extraction Results</title>
+    <link rel="stylesheet" href="../static/css/styles.css">
+</head>
+<body>
+    <h1>Extraction Results</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Text</th>
+                <th>Confidence (%)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for detail in extracted_details %}
+            <tr>
+                <td>{{ detail.text }}</td>
+                <td>{{ detail.confidence }}%</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

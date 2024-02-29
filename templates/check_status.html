@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Upload Successful</title>
+    <link rel="stylesheet" href="../static/css/styles.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+        $(document).ready(function () {
+    var jobId = "{{ job_id }}";
+    function checkStatus() {
+        $.ajax({
+            type: "POST",
+            url: "/result",
+            data: { jobId: jobId },
+            success: function (htmlContent) {
+                // Directly use the HTML content received
+                $('#resultContainer').html(htmlContent);
+            },
+            error: function (xhr, status, error) {
+                console.log("Error:", error); // Log any error
+                $('#resultContainer').text('An error occurred while processing your request.');
+            }
+        });
+    }
+    checkStatus();
+});
+
+    </script>
+</head>
+
+<body>
+    <p id="resultContainer">Processing your document... Please wait.</p>
+</body>
+
+</html>
