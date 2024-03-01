@@ -1,14 +1,25 @@
 from flask import Flask, request, render_template, jsonify
 import boto3
 import time
+import os
+from dotenv import load_dotenv
 
+load_dotenv()  # This method will load the .env file
 app = Flask(__name__)
+
+
+
+aws_bucket_name = os.getenv("BUCKET_NAME")
+# BUCKET_NAME = 'textra-bucket' 
+# Now you can access the environment variables using os.getenv
+aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
+aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+aws_region = os.getenv("AWS_REGION")
+aws_client = os.getenv("AWS_CLIENT")
 
 # Initialize the S3 and Textract clients
 s3 = boto3.client('s3')
-textract = boto3.client('textract', region_name='us-east-1')
-
-BUCKET_NAME = 'textra-bucket' 
+textract = boto3.client(aws_client, region_name=aws_region)
 
 def process_upload(file):
     if not file or file.filename == '':
@@ -16,10 +27,10 @@ def process_upload(file):
 
     if allowed_file(file.filename):
         file_key = 'uploads/' + file.filename
-        s3.upload_fileobj(file, BUCKET_NAME, file_key)
+        s3.upload_fileobj(file, aws_bucket_name, file_key)
 
         response = textract.start_document_text_detection(
-            DocumentLocation={'S3Object': {'Bucket': BUCKET_NAME, 'Name': file_key}}
+            DocumentLocation={'S3Object': {'Bucket': aws_bucket_name, 'Name': file_key}}
         )
         return response['JobId'], None
     else:
