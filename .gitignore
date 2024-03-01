@@ -1,3 +1,5 @@
 /.history
 /venv
 textract_accessKeys.csv
+/__pycache__
+.env
