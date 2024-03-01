@@ -8,6 +8,14 @@
     <script>
         $(document).ready(function () {
             var jobId = "{{ job_id }}";
+            var progress = 1; // Start progress at 1%
+            var maxProgressEmulation = 95; // Max before completion to avoid reaching 100% prematurely
+
+            function updateProgressBar() {
+                $('#progressBarFill').css('width', progress + '%');
+                $('#progressBarFill').text(progress + '%');
+            }
+
             function checkStatus() {
                 $.ajax({
                     type: "POST",
@@ -15,31 +23,38 @@
                     data: { jobId: jobId },
                     success: function (data) {
                         if (data.status === 'COMPLETED') {
-                            // Process and display the extracted data
+                            $('#progressBarFill').css('width', '100%');
+                            $('#progressBarFill').text('100%');
                             console.log('Data:', data.data);
                             // You might want to render this data on the page
                         } else if (data.status === 'IN_PROGRESS') {
-                            // The job is still processing; poll again after some delay
+                            if (progress < maxProgressEmulation) {
+                                progress++; // Increment the progress
+                                updateProgressBar();
+                            }
                             setTimeout(checkStatus, 5000);
                         } else {
-                            // Handle any errors or failed processing status
                             console.error('Processing failed or error occurred');
                         }
                     },
                     error: function (xhr, status, error) {
-                        console.log("Error:", error); // Log any error
+                        console.log("Error:", error);
                         $('#resultContainer').text('An error occurred while processing your request.');
                     }
                 });
             }
-            checkStatus();
-        });
 
+            updateProgressBar(); // Initialize the progress bar
+            checkStatus(); // Begin status checks
+        });
     </script>
 </head>
 
 <body>
     <p id="resultContainer">Processing your document... Please wait.</p>
+    <div id="progressBar">
+        <div id="progressBarFill">1%</div>
+    </div>
 </body>
 
 </html>
